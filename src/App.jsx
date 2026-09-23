@@ -1,9 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Send, Bot, User, Sparkles, BookOpen, Sun, Moon } from 'lucide-react';
+import {
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  BookOpen,
+  Sun,
+  Moon
+} from 'lucide-react';
 
 export default function App() {
-  // إنشاء Session ID مستقل لكل جلسة متصفح بأمان تام
+  // إنشاء Session ID مستقل لكل جلسة متصفح
   const [sessionId] = useState(() => {
     let id = sessionStorage.getItem('chat-session-id');
 
@@ -13,8 +21,16 @@ export default function App() {
           if (window.crypto && window.crypto.randomUUID) {
             return window.crypto.randomUUID();
           }
-        } catch (e) {}
-        return 'user-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+        } catch (e) {
+          console.error('UUID generation error:', e);
+        }
+
+        return (
+          'user-' +
+          Date.now().toString(36) +
+          '-' +
+          Math.random().toString(36).substr(2, 9)
+        );
       };
 
       id = generateSafeId();
@@ -27,7 +43,8 @@ export default function App() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'أهلاً بك! أنا **ميسرة**، الوكيل المرجعي الذكي لمكتبة كلية الآداب بجامعة طنطا. كيف يمكنني مساعدتك اليوم؟'
+      content:
+        'أهلاً بك! أنا **ميسرة**، الوكيل المرجعي الذكي لمكتبة كلية الآداب بجامعة طنطا. كيف يمكنني مساعدتك اليوم؟'
     }
   ]);
 
@@ -38,7 +55,9 @@ export default function App() {
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth'
+    });
   };
 
   useEffect(() => {
@@ -87,17 +106,38 @@ export default function App() {
         }
       );
 
+      // إذا رجع الخادم بكود خطأ، نعرض الكود الحقيقي للتشخيص
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Webhook error ${response.status}: ${errorText}`);
+
+        throw new Error(
+          `HTTP ${response.status} ${response.statusText}${
+            errorText ? `\n${errorText}` : ''
+          }`
+        );
       }
 
-      const data = await response.json();
+      // محاولة قراءة الرد كـ JSON
+      let data;
 
-      if (!data.output) {
-        throw new Error('No output returned from n8n');
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        throw new Error(
+          'تم الاتصال بـ n8n، لكن الرد المستلم ليس بصيغة JSON صحيحة.'
+        );
       }
 
+      // التأكد من وجود output
+      if (!data || !data.output) {
+        console.error('Invalid response from n8n:', data);
+
+        throw new Error(
+          'تم الاتصال بـ n8n بنجاح، لكن لم يتم إرجاع الحقل output.'
+        );
+      }
+
+      // عرض الرد الحقيقي القادم من AI Agent
       setMessages([
         ...newMessages,
         {
@@ -107,11 +147,16 @@ export default function App() {
       ]);
     } catch (error) {
       console.error('Webhook error:', error);
+
+      // رسالة تشخيصية مؤقتة حتى نعرف السبب الحقيقي للمشكلة
       setMessages([
         ...newMessages,
         {
           role: 'assistant',
-          content: 'عذراً، تعذر الاتصال بالوكيل حالياً. يرجى إعادة المحاولة.'
+          content:
+            `حدث خطأ أثناء الاتصال بالوكيل.\n\n` +
+            `**تفاصيل الخطأ:**\n` +
+            `${error?.message || 'Unknown error'}`
         }
       ]);
     } finally {
@@ -130,13 +175,16 @@ export default function App() {
           <div className="w-10 h-10 rounded-full bg-blue-900 dark:bg-slate-800 flex items-center justify-center border border-blue-700 dark:border-slate-700 shadow-inner">
             <Bot className="w-6 h-6 text-amber-400" />
           </div>
+
           <div>
             <h1 className="font-bold text-lg tracking-wide text-white flex items-center gap-2">
               ميسرة
+
               <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">
                 الوكيل المرجعي
               </span>
             </h1>
+
             <p className="text-xs text-blue-300 dark:text-slate-400">
               مكتبة كلية الآداب - جامعة طنطا
             </p>
@@ -146,12 +194,15 @@ export default function App() {
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex items-center gap-2 text-xs text-blue-200 bg-blue-900/50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-blue-800 dark:border-slate-700">
             <BookOpen className="w-4 h-4 text-amber-400" />
+
             <span>متاح للرد الفوري</span>
           </div>
+
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 rounded-full hover:bg-blue-900 dark:hover:bg-slate-800 transition-colors"
             title="تبديل المظهر"
+            type="button"
           >
             {isDarkMode ? (
               <Sun className="w-5 h-5 text-amber-400" />
@@ -168,7 +219,9 @@ export default function App() {
           <div
             key={idx}
             className={`flex gap-3 ${
-              msg.role === 'user' ? 'justify-end' : 'justify-start'
+              msg.role === 'user'
+                ? 'justify-end'
+                : 'justify-start'
             }`}
           >
             {msg.role === 'assistant' && (
@@ -176,6 +229,7 @@ export default function App() {
                 <Bot className="w-4 h-4" />
               </div>
             )}
+
             <div
               className={`p-4 rounded-2xl max-w-[85%] sm:max-w-[70%] text-sm leading-relaxed shadow-sm transition-colors duration-300 ${
                 msg.role === 'user'
@@ -184,9 +238,12 @@ export default function App() {
               }`}
             >
               <div className="markdown-content">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown>
+                  {msg.content}
+                </ReactMarkdown>
               </div>
             </div>
+
             {msg.role === 'user' && (
               <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
                 <User className="w-4 h-4" />
@@ -194,17 +251,21 @@ export default function App() {
             )}
           </div>
         ))}
+
         {isLoading && (
           <div className="flex gap-3 justify-start items-center">
             <div className="w-8 h-8 rounded-full bg-blue-900 dark:bg-slate-800 text-amber-400 flex items-center justify-center shadow-sm border border-transparent dark:border-slate-700">
               <Bot className="w-4 h-4" />
             </div>
+
             <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs transition-colors duration-300">
               <Sparkles className="w-4 h-4 text-amber-500 animate-spin" />
-              <span>Thinking...</span>
+
+              <span>جاري البحث وإعداد الإجابة...</span>
             </div>
           </div>
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -218,9 +279,10 @@ export default function App() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="اسأل اي سؤال"
+            placeholder="اكتب استفسارك هنا..."
             className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900/20 dark:focus:ring-blue-500/20 focus:border-blue-900 dark:focus:border-blue-500 transition-all text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
+
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
@@ -229,6 +291,7 @@ export default function App() {
             <Send className="w-4 h-4" />
           </button>
         </form>
+
         <p className="text-center text-[11px] text-slate-400 dark:text-slate-500 mt-2">
           الخدمة المرجعية الذكية • جامعة طنطا
         </p>
