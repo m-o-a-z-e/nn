@@ -3,13 +3,24 @@ import ReactMarkdown from 'react-markdown';
 import { Send, Bot, User, Sparkles, BookOpen, Sun, Moon } from 'lucide-react';
 
 export default function App() {
-  // إنشاء Session ID مستقل لكل جلسة متصفح
+  // إنشاء Session ID مستقل لكل جلسة متصفح بأمان تام
   const [sessionId] = useState(() => {
     let id = sessionStorage.getItem('chat-session-id');
+
     if (!id) {
-      id = crypto.randomUUID();
+      const generateSafeId = () => {
+        try {
+          if (window.crypto && window.crypto.randomUUID) {
+            return window.crypto.randomUUID();
+          }
+        } catch (e) {}
+        return 'user-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+      };
+
+      id = generateSafeId();
       sessionStorage.setItem('chat-session-id', id);
     }
+
     return id;
   });
 
@@ -22,8 +33,6 @@ export default function App() {
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // حالة الـ Dark Mode
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const messagesEndRef = useRef(null);
@@ -36,7 +45,6 @@ export default function App() {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // تفعيل وإلغاء كلاس الـ dark على مستوى الصفحة كلها
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -97,7 +105,6 @@ export default function App() {
           content: data.output
         }
       ]);
-
     } catch (error) {
       console.error('Webhook error:', error);
       setMessages([
@@ -141,7 +148,6 @@ export default function App() {
             <BookOpen className="w-4 h-4 text-amber-400" />
             <span>متاح للرد الفوري</span>
           </div>
-          {/* زرار اللايت / دارك مود */}
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 rounded-full hover:bg-blue-900 dark:hover:bg-slate-800 transition-colors"
