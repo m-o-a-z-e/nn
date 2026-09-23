@@ -83,27 +83,36 @@ export default function App() {
         }
       );
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Webhook error ${response.status}: ${errorText}`);
+      }
+      
       const data = await response.json();
-
+      
+      if (!data.output) {
+        throw new Error('No output returned from n8n');
+      }
+      
       setMessages([
         ...newMessages,
         {
           role: 'assistant',
-          content: data.output || 'عذراً، حدث خطأ في الرد.'
+          content: data.output
         }
       ]);
 
-    } catch (error) {
-
-      setTimeout(() => {
+    } } catch (error) {
+        console.error('Webhook error:', error);
+      
         setMessages([
           ...newMessages,
           {
             role: 'assistant',
-            content:
-              'أكيد بخصوص استفسارك.. أنا ميسرة وجاهز أساعدك في كل لوائح المكتبة والأقسام! (جاري ربط الـ Webhook الفعلي).'
+            content: 'عذراً، تعذر الاتصال بالوكيل حالياً. يرجى إعادة المحاولة.'
           }
         ]);
+      }
       }, 1000);
 
     } finally {
