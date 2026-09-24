@@ -1,38 +1,40 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import {
-  Send,
-  Bot,
-  User,
-  Sparkles,
-  BookOpen,
-  Sun,
-  Moon
-} from 'lucide-react';
+import { Send, Bot, User, Sparkles, BookOpen, Sun, Moon } from 'lucide-react';
+
+const START_WEBHOOK =
+  'https://n8nabdullahanas.dpdns.org/webhook/rusa-ifla-chat-start-v2';
+
+const STATUS_WEBHOOK =
+  'https://n8nabdullahanas.dpdns.org/webhook/rusa-ifla-chat-status-v2';
+
+const POLL_INTERVAL = 3000;
+const MAX_WAIT_TIME = 10 * 60 * 1000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const generateSafeId = () => {
+  try {
+    if (window.crypto?.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+  } catch (e) {
+    console.error('ID generation error:', e);
+  }
+
+  return (
+    'id-' +
+    Date.now().toString(36) +
+    '-' +
+    Math.random().toString(36).slice(2, 11)
+  );
+};
 
 export default function App() {
-  // إنشاء Session ID مستقل لكل جلسة متصفح
   const [sessionId] = useState(() => {
     let id = sessionStorage.getItem('chat-session-id');
 
     if (!id) {
-      const generateSafeId = () => {
-        try {
-          if (window.crypto && window.crypto.randomUUID) {
-            return window.crypto.randomUUID();
-          }
-        } catch (e) {
-          console.error('UUID generation error:', e);
-        }
-
-        return (
-          'user-' +
-          Date.now().toString(36) +
-          '-' +
-          Math.random().toString(36).substr(2, 9)
-        );
-      };
-
       id = generateSafeId();
       sessionStorage.setItem('chat-session-id', id);
     }
@@ -55,9 +57,7 @@ export default function App() {
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth'
-    });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
@@ -72,12 +72,54 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  const pollForResult = async (taskId) => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < MAX_WAIT_TIME) {
+      try {
+        const url = new URL(STATUS_WEBHOOK);
+        url.searchParams.set('taskId', taskId);
+        url.searchParams.set('sessionId', sessionId);
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          cache: 'no-store'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          if (data.status === 'completed') {
+            if (!data.output) {
+              throw new Error('اكتمل التنفيذ ولكن لم يتم إرجاع إجابة.');
+            }
+            return data.output;
+          }
+
+          if (data.status === 'error') {
+            throw new Error(data.error || 'حدث خطأ أثناء تنفيذ الطلب.');
+          }
+        }
+      } catch (error) {
+        console.warn('Temporary polling error:', error);
+      }
+
+      await sleep(POLL_INTERVAL);
+    }
+
+    throw new Error(
+      'استغرق تنفيذ الطلب وقتاً أطول من المتوقع. يرجى إعادة المحاولة.'
+    );
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
 
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
+    const taskId = generateSafeId();
+
     setInput('');
 
     const newMessages = [
@@ -92,71 +134,40 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        'https://n8nabdullahanas.dpdns.org/webhook/0891b873-0b99-4e2a-a84e-5afcdfb1515e',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            chatInput: userMessage,
-            sessionId: sessionId
-          })
-        }
-      );
+      const startResponse = await fetch(START_WEBHOOK, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          chatInput: userMessage,
+          sessionId,
+          taskId
+        })
+      });
 
-      // إذا رجع الخادم بكود خطأ، نعرض الكود الحقيقي للتشخيص
-      if (!response.ok) {
-        const errorText = await response.text();
-
-        throw new Error(
-          `HTTP ${response.status} ${response.statusText}${
-            errorText ? `\n${errorText}` : ''
-          }`
-        );
+      if (!startResponse.ok) {
+        throw new Error(`تعذر بدء الطلب. HTTP ${startResponse.status}`);
       }
 
-      // محاولة قراءة الرد كـ JSON
-      let data;
+      const output = await pollForResult(taskId);
 
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        throw new Error(
-          'تم الاتصال بـ n8n، لكن الرد المستلم ليس بصيغة JSON صحيحة.'
-        );
-      }
-
-      // التأكد من وجود output
-      if (!data || !data.output) {
-        console.error('Invalid response from n8n:', data);
-
-        throw new Error(
-          'تم الاتصال بـ n8n بنجاح، لكن لم يتم إرجاع الحقل output.'
-        );
-      }
-
-      // عرض الرد الحقيقي القادم من AI Agent
       setMessages([
         ...newMessages,
         {
           role: 'assistant',
-          content: data.output
+          content: output
         }
       ]);
     } catch (error) {
-      console.error('Webhook error:', error);
+      console.error('Chat error:', error);
 
-      // رسالة تشخيصية مؤقتة حتى نعرف السبب الحقيقي للمشكلة
       setMessages([
         ...newMessages,
         {
           role: 'assistant',
           content:
-            `حدث خطأ أثناء الاتصال بالوكيل.\n\n` +
-            `**تفاصيل الخطأ:**\n` +
-            `${error?.message || 'Unknown error'}`
+            'عذراً، تعذر إكمال الطلب حالياً. يرجى إعادة المحاولة.'
         }
       ]);
     } finally {
@@ -169,7 +180,6 @@ export default function App() {
       className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300 font-sans"
       dir="rtl"
     >
-      {/* Header */}
       <header className="bg-blue-950 dark:bg-slate-950 text-white shadow-md px-6 py-4 flex items-center justify-between border-b border-blue-900 dark:border-slate-800 transition-colors duration-300">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-900 dark:bg-slate-800 flex items-center justify-center border border-blue-700 dark:border-slate-700 shadow-inner">
@@ -179,7 +189,6 @@ export default function App() {
           <div>
             <h1 className="font-bold text-lg tracking-wide text-white flex items-center gap-2">
               ميسرة
-
               <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">
                 الوكيل المرجعي
               </span>
@@ -194,15 +203,14 @@ export default function App() {
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex items-center gap-2 text-xs text-blue-200 bg-blue-900/50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-blue-800 dark:border-slate-700">
             <BookOpen className="w-4 h-4 text-amber-400" />
-
             <span>متاح للرد الفوري</span>
           </div>
 
           <button
+            type="button"
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 rounded-full hover:bg-blue-900 dark:hover:bg-slate-800 transition-colors"
             title="تبديل المظهر"
-            type="button"
           >
             {isDarkMode ? (
               <Sun className="w-5 h-5 text-amber-400" />
@@ -213,15 +221,12 @@ export default function App() {
         </div>
       </header>
 
-      {/* منطقة المحادثة */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
         {messages.map((msg, idx) => (
           <div
             key={idx}
             className={`flex gap-3 ${
-              msg.role === 'user'
-                ? 'justify-end'
-                : 'justify-start'
+              msg.role === 'user' ? 'justify-end' : 'justify-start'
             }`}
           >
             {msg.role === 'assistant' && (
@@ -238,9 +243,7 @@ export default function App() {
               }`}
             >
               <div className="markdown-content">
-                <ReactMarkdown>
-                  {msg.content}
-                </ReactMarkdown>
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
               </div>
             </div>
 
@@ -260,7 +263,6 @@ export default function App() {
 
             <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs transition-colors duration-300">
               <Sparkles className="w-4 h-4 text-amber-500 animate-spin" />
-
               <span>جاري البحث وإعداد الإجابة...</span>
             </div>
           </div>
@@ -269,7 +271,6 @@ export default function App() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* صندوق الإدخال السفلي */}
       <div className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-4 shadow-lg transition-colors duration-300">
         <form
           onSubmit={sendMessage}
