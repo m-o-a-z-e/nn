@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Send, Bot, User, Sparkles, BookOpen, Sun, Moon } from 'lucide-react';
 
 const START_WEBHOOK =
@@ -236,14 +237,87 @@ export default function App() {
             )}
 
             <div
-              className={`p-4 rounded-2xl max-w-[85%] sm:max-w-[70%] text-sm leading-relaxed shadow-sm transition-colors duration-300 ${
+              className={`p-4 rounded-2xl max-w-[85%] sm:max-w-[70%] text-sm leading-relaxed shadow-sm transition-colors duration-300 overflow-hidden ${
                 msg.role === 'user'
                   ? 'bg-blue-900 dark:bg-blue-700 text-white rounded-bl-none'
                   : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 rounded-br-none'
               }`}
             >
               <div className="markdown-content">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    table: ({ node, ...props }) => (
+                      <div className="overflow-x-auto my-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <table
+                          className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-right border-collapse"
+                          {...props}
+                        />
+                      </div>
+                    ),
+                    thead: ({ node, ...props }) => (
+                      <thead
+                        className="bg-slate-100 dark:bg-slate-900/60"
+                        {...props}
+                      />
+                    ),
+                    tbody: ({ node, ...props }) => (
+                      <tbody
+                        className="divide-y divide-slate-200 dark:divide-slate-700/70 bg-white dark:bg-slate-800"
+                        {...props}
+                      />
+                    ),
+                    tr: ({ node, ...props }) => (
+                      <tr
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors"
+                        {...props}
+                      />
+                    ),
+                    th: ({ node, ...props }) => (
+                      <th
+                        className="px-4 py-2.5 text-xs sm:text-sm font-bold text-blue-950 dark:text-amber-400 whitespace-nowrap border-l last:border-l-0 border-slate-200 dark:border-slate-700"
+                        {...props}
+                      />
+                    ),
+                    td: ({ node, ...props }) => (
+                      <td
+                        className="px-4 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 align-top border-l last:border-l-0 border-slate-200 dark:border-slate-700"
+                        {...props}
+                      />
+                    ),
+                    a: ({ node, ...props }) => (
+                      <a
+                        className="text-blue-600 dark:text-amber-400 font-medium hover:underline break-all"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...props}
+                      />
+                    ),
+                    ul: ({ node, ...props }) => (
+                      <ul
+                        className="list-disc list-inside space-y-1 my-2"
+                        {...props}
+                      />
+                    ),
+                    ol: ({ node, ...props }) => (
+                      <ol
+                        className="list-decimal list-inside space-y-1 my-2"
+                        {...props}
+                      />
+                    ),
+                    p: ({ node, ...props }) => (
+                      <p className="mb-2 last:mb-0" {...props} />
+                    ),
+                    strong: ({ node, ...props }) => (
+                      <strong
+                        className="font-bold text-slate-900 dark:text-white"
+                        {...props}
+                      />
+                    )
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
               </div>
             </div>
 
