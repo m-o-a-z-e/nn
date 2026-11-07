@@ -4,10 +4,10 @@ import remarkGfm from 'remark-gfm';
 import { Send, Bot, User, Sparkles, BookOpen, Sun, Moon } from 'lucide-react';
 
 const START_WEBHOOK =
-  'https://n8nabdullahanas.dpdns.org/webhook/rusa-ifla-chat-start-v2';
+  'https://maysara2026.app.n8n.cloud/webhook/rusa-ifla-chat-start-v2';
 
 const STATUS_WEBHOOK =
-  'https://n8nabdullahanas.dpdns.org/webhook/rusa-ifla-chat-status-v2';
+  'https://maysara2026.app.n8n.cloud/webhook/rusa-ifla-chat-status-v2';
 
 const POLL_INTERVAL = 3000;
 const MAX_WAIT_TIME = 10 * 60 * 1000;
