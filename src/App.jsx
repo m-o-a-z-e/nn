@@ -3,11 +3,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Send, Bot, User, Sparkles, BookOpen, Sun, Moon } from 'lucide-react';
 
-const START_WEBHOOK =
-  'https://maysara2026.app.n8n.cloud/webhook/rusa-ifla-chat-start-v2';
+// استبدال localhost برابط Ngrok الثابت
+const NGROK_BASE_URL = 'https://makeover-repurpose-demeanor.ngrok-free.dev';
 
-const STATUS_WEBHOOK =
-  'https://maysara2026.app.n8n.cloud/webhook/rusa-ifla-chat-status-v2';
+const START_WEBHOOK = `${NGROK_BASE_URL}/webhook/rusa-ifla-chat-start-v2`;
+const STATUS_WEBHOOK = `${NGROK_BASE_URL}/webhook/rusa-ifla-chat-status-v2`;
 
 const POLL_INTERVAL = 3000;
 const MAX_WAIT_TIME = 10 * 60 * 1000;
@@ -84,6 +84,9 @@ export default function App() {
 
         const response = await fetch(url.toString(), {
           method: 'GET',
+          headers: {
+            'ngrok-skip-browser-warning': 'true' // مهم جداً لتخطي صفحة تحذير ngrok
+          },
           cache: 'no-store'
         });
 
@@ -138,7 +141,8 @@ export default function App() {
       const startResponse = await fetch(START_WEBHOOK, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true' // مهم جداً هنا أيضاً لتخطي صفحة ngrok
         },
         body: JSON.stringify({
           chatInput: userMessage,
